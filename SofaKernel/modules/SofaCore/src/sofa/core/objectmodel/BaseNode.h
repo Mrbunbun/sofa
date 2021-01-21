@@ -136,7 +136,7 @@ public:
     /// Return the path from this node to the root node
     virtual std::string getRootPath() const;
 
-    Base* findLinkDestClass(const BaseClass* destType, const std::string& path, const BaseLink* link) override = 0;
+    void* findLinkDestClass(const BaseClass* destType, const std::string& path, const BaseLink* link) override = 0;
 
     /// @}
 

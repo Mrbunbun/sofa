@@ -327,7 +327,8 @@ public:
     /// Find an object given its name
     sofa::core::objectmodel::BaseObject* getObject(const std::string& name) const;
 
-    Base* findLinkDestClass(const sofa::core::objectmodel::BaseClass* destType, const std::string& path, const sofa::core::objectmodel::BaseLink* link) override;
+    void* findLinkDestClass(const sofa::core::objectmodel::BaseClass* destType, const std::string& path, const sofa::core::objectmodel::BaseLink* link) override;
+
 
     /// Generic object access, given a set of required tags, possibly searching up or down from the current context
     ///

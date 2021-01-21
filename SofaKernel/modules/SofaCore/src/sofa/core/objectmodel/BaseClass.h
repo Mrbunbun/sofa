@@ -96,7 +96,7 @@ public:
         return !((*this)==c);
     }
 
-    virtual Base* dynamicCast(Base* obj) const = 0;
+    virtual void* dynamicCast(Base* obj) const = 0;
     virtual bool isInstance(Base* obj) const = 0;
 
     ///////////////////////////////// DEPRECATED //////////////////////////////////////////////////
@@ -143,7 +143,7 @@ class SOFA_CORE_API DeprecatedBaseClass : public BaseClass
 public:
     DeprecatedBaseClass();
 
-    Base* dynamicCast(Base*) const override { return nullptr; }
+    void* dynamicCast(Base*) const override { return nullptr; }
     bool isInstance(Base*) const override { return false; }
 
     static BaseClass* GetSingleton();
@@ -388,9 +388,11 @@ protected:
     }
     ~TClass() override {}
 
-    Base* dynamicCast(Base* obj) const override
+    void* dynamicCast(Base* obj) const override
     {
-        return dynamic_cast<T*>(obj);
+        T* ptr = nullptr;
+        T::dynamicCast(ptr, obj);
+        return ptr;
     }
 
     bool isInstance(Base* obj) const override
