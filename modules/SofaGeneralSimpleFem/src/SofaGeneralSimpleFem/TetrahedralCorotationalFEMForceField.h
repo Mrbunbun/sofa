@@ -236,12 +236,18 @@ public:
 
 protected:
 
+    ////////////// Forcefield computation
     void computeStrainDisplacement( StrainDisplacementTransposed &J, Coord a, Coord b, Coord c, Coord d );
     Real peudo_determinant_for_coef ( const defaulttype::Mat<2, 3, Real>&  M );
 
     void computeStiffnessMatrix( StiffnessMatrix& S,StiffnessMatrix& SR,const MaterialStiffness &K, const StrainDisplacementTransposed &J, const Transformation& Rot );
 
-    void computeMaterialStiffness(int i, Index&a, Index&b, Index&c, Index&d);
+    void computeMaterialStiffness(int i, Index& a, Index& b, Index& c, Index& d);
+
+    void computeStrain(defaulttype::Vec<6, Real> &strain, const StrainDisplacementTransposed &J, const Displacement &D);
+    void computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<3, Real> &strain);
+    void computePrincipalStrain(Index elementIndex, defaulttype::Vec<6, Real> &strain);
+    void computePrincipalStress(Index elementIndex, defaulttype::Vec<6, Real> &stress);
 
     /// overloaded by classes with non-uniform stiffness
     virtual void computeMaterialStiffness(MaterialStiffness& materialMatrix, Index&a, Index&b, Index&c, Index&d, SReal localStiffnessFactor=1);
@@ -295,6 +301,7 @@ public:
     Data<bool> _showVonMisesColorMap;
     Real minVM;
     Real maxVM;
+
 };
 
 #if  !defined(SOFA_COMPONENT_FORCEFIELD_TETRAHEDRALCOROTATIONALFEMFORCEFIELD_CPP)

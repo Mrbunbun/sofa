@@ -1609,7 +1609,6 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::handleEvent(core::objectmo
     }
 }
 
-
 template<class DataTypes>
 void TetrahedralCorotationalFEMForceField<DataTypes>::computeVonMisesStress()
 {
@@ -1752,6 +1751,46 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computeVonMisesStress()
         maxVM = prevMaxStress;
 
     maxVM *= _showStressAlpha.getValue();
+}
+
+// --------------------------------------------------------------------------------------------------------
+// --- Strain = StrainDisplacement * Displacement = JtD = Bd
+// --------------------------------------------------------------------------------------------------------
+template <class DataTypes>
+void TetrahedralCorotationalFEMForceField<DataTypes>::computeStrain(defaulttype::Vec<6, Real> &strain, const StrainDisplacementTransposed &J, const Displacement &D)
+{
+    defaulttype::Mat<6, 12, Real> Jt;
+    Jt.transpose(J);
+
+    strain[0] = Jt[0][0] * D[0] + /* Jt[0][1] * D[1] + Jt[0][2] * D[2] + */ Jt[0][3] * D[3] + /* Jt[0][4] * D[4] + Jt[0][5] * D[5] + */ Jt[0][6] * D[6] + /*Jt[0][7] * D[7] + Jt[0][8] * D[8] + */ Jt[0][9] * D[9] /* + Jt[0][10] * D[10] + Jt[0][11] * D[11] */;
+    strain[1] = /*Jt[1][0] * D[0] + */ Jt[1][1] * D[1] + /*Jt[1][2] * D[2] + Jt[1][3] * D[3] + */ Jt[1][4] * D[4] + /* Jt[1][5] * D[5] + Jt[1][6] * D[6] + */ Jt[1][7] * D[7] + /*Jt[1][8] * D[8] + Jt[1][9] * D[9] + */ Jt[1][10] * D[10] /* + Jt[1][11] * D[11] */;
+    strain[2] = /* Jt[2][0] * D[0] + Jt[2][1] * D[1] + */ Jt[2][2] * D[2] + /* Jt[2][3] * D[3] + Jt[2][4] * D[4] + */ Jt[2][5] * D[5] + /*Jt[2][6] * D[6] + Jt[2][7] * D[7] + */ Jt[2][8] * D[8] + /*Jt[2][9] * D[9] + Jt[2][10] * D[10] + */ Jt[2][11] * D[11];
+    strain[3] = Jt[3][0] * D[0] + Jt[3][1] * D[1] + /* Jt[3][2] * D[2] + */ Jt[3][3] * D[3] + Jt[3][4] * D[4] + /*Jt[3][5] * D[5] */ + Jt[3][6] * D[6] + Jt[3][7] * D[7] + /*Jt[3][8] * D[8] + */ Jt[3][9] * D[9] + Jt[3][10] * D[10] /* + Jt[3][11] * D[11]*/;
+    strain[4] = /*Jt[4][0] * D[0] + */ Jt[4][1] * D[1] + Jt[4][2] * D[2] + /*Jt[4][3] * D[3] + */ Jt[4][4] * D[4] + Jt[4][5] * D[5] + /*Jt[4][6] * D[6] + */ Jt[4][7] * D[7] + Jt[4][8] * D[8] + /*Jt[4][9] * D[9] + */ Jt[4][10] * D[10] + Jt[4][11] * D[11];
+    strain[5] = Jt[5][0] * D[5] + /*Jt[5][1] * D[1] + */ Jt[5][2] * D[2] + Jt[5][3] * D[3] + /*Jt[5][4] * D[4] + */ Jt[5][5] * D[5] + Jt[5][6] * D[6] + /*Jt[5][7] * D[7] + */ Jt[5][8] * D[8] + Jt[5][9] * D[9] + /*Jt[5][10] * D[10] + */ Jt[5][11] * D[11];
+    
+}
+
+// --------------------------------------------------------------------------------------------------------
+// --- Stress = K * Strain = KJtD = KBd
+// --------------------------------------------------------------------------------------------------------
+template <class DataTypes>
+void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<3, Real> &strain)
+{
+    stress[0] = K[0][0] * strain[0] + K[0][1] * strain[1] + K[0][2] * strain[2] /* + K[0][3] * strain[3] + K[0][4] * strain[4] + K[0][5] * strain[5]*/;
+    stress[1] = K[1][0] * strain[0] + K[1][1] * strain[1] + K[1][2] * strain[2] /* + K[1][3] * strain[3] + K[1][4] * strain[4] + K[1][5] * strain[5]*/;
+    stress[2] = K[2][0] * strain[0] + K[2][1] * strain[1] + K[2][2] * strain[2] /* + K[2][3] * strain[3] + K[2][4] * strain[4] + K[2][5] * strain[5]*/;
+    stress[3] = /*K[3][0] * strain[0] + K[3][1] * strain[1] + K[3][2] * strain[2] + */ K[3][3] * strain[3] /* + K[3][4] * strain[4] + K[3][5] * strain[5]*/;
+    stress[4] = /*K[4][0] * strain[0] + K[4][1] * strain[1] + K[4][2] * strain[2] + K[4][3] * strain[3] + */ K[4][4] * strain[4] /* + K[4][5] * strain[5]*/;
+    stress[3] = /*K[5][0] * strain[0] + K[5][1] * strain[1] + K[5][2] * strain[2] + K[5][3] * strain[3] + K[5][4] * strain[4] + */ K[5][5] * strain[5];
+}
+
+// --------------------------------------------------------------------------------------
+// ---	Compute direction of maximum strain (strain = JtD = BD)
+// --------------------------------------------------------------------------------------
+template <class DataTypes>
+void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStrain(Index elementIndex, defaulttype::Vec<6, Real>& strain)
+{
 }
 
 } // namespace sofa::component::forcefield
