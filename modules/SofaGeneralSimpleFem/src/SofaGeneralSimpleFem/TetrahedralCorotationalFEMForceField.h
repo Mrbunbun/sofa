@@ -115,6 +115,14 @@ protected:
         Transformation initialTransformation;
         /// von Mises stress
         Real vonMisesStress;
+        /// max strain
+        Real maxStrain;
+        /// principal strain direction
+        Coord principalStrainDirection;
+        /// max stress
+        Real maxStress;
+        /// principal stress direction
+        Coord principalStressDirection;
 
         TetrahedronInformation()
         {

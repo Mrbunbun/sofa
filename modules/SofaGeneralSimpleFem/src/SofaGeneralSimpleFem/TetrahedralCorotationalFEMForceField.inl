@@ -32,6 +32,10 @@
 #include <sofa/simulation/AnimateEndEvent.h>
 
 
+#include <newmat/newmat.h>
+#include <newmat/newmatap.h>
+
+
 
 namespace sofa::component::forcefield
 {
@@ -1782,7 +1786,7 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype:
     stress[2] = K[2][0] * strain[0] + K[2][1] * strain[1] + K[2][2] * strain[2] /* + K[2][3] * strain[3] + K[2][4] * strain[4] + K[2][5] * strain[5]*/;
     stress[3] = /*K[3][0] * strain[0] + K[3][1] * strain[1] + K[3][2] * strain[2] + */ K[3][3] * strain[3] /* + K[3][4] * strain[4] + K[3][5] * strain[5]*/;
     stress[4] = /*K[4][0] * strain[0] + K[4][1] * strain[1] + K[4][2] * strain[2] + K[4][3] * strain[3] + */ K[4][4] * strain[4] /* + K[4][5] * strain[5]*/;
-    stress[3] = /*K[5][0] * strain[0] + K[5][1] * strain[1] + K[5][2] * strain[2] + K[5][3] * strain[3] + K[5][4] * strain[4] + */ K[5][5] * strain[5];
+    stress[5] = /*K[5][0] * strain[0] + K[5][1] * strain[1] + K[5][2] * strain[2] + K[5][3] * strain[3] + K[5][4] * strain[4] + */ K[5][5] * strain[5];
 }
 
 // --------------------------------------------------------------------------------------
@@ -1791,6 +1795,71 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype:
 template <class DataTypes>
 void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStrain(Index elementIndex, defaulttype::Vec<6, Real>& strain)
 {
+    NEWMAT::SymmetricMatrix e(3);
+    e = 0.0;
+
+    NEWMAT::DiagonalMatrix D(3);
+    D = 0.0;
+
+    NEWMAT::Matrix V(3, 3);
+    V = 0.0;
+
+    e(1, 1) = strain[0];
+    e(2, 2) = strain[1];
+    e(3, 3) = strain[2];
+    e(2, 3) = strain[3];
+    e(3, 2) = strain[3];
+    e(1, 3) = strain[4];
+    e(3, 1) = strain[4];
+    e(1, 2) = strain[5];
+    e(2, 1) = strain[5];
+
+    NEWMAT::Jacobi(e, D, V);
+
+    Coord v((Real)V(1, 1), (Real)V(2, 1), (Real)V(3, 1));
+    v.normalize();
+
+    helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
+
+    tetraInf[elementIndex].maxStrain = (Real)D(1, 1);
+    tetraInf[elementIndex].principalStrainDirection = tetrahedronInf[elementIndex].rotatedInitialElements * Coord(v[0], v[1], v[2]);
+    tetraInf[elementIndex].principalStrainDirection *= tetraInf[elementIndex].maxStrain / 100.00;
+    tetrahedronInfo.endEdit();
+}
+
+template <class DataTypes>
+void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStress(Index elementIndex, defaulttype::Vec<6, Real>& stress)
+{
+    NEWMAT::SymmetricMatrix e(2);
+    e = 0.0;
+
+    NEWMAT::DiagonalMatrix D(2);
+    D = 0.0;
+
+    NEWMAT::Matrix V(2, 2);
+    V = 0.0;
+
+    e(1, 1) = stress[0];
+    e(2, 2) = stress[1];
+    e(3, 3) = stress[2];
+    e(2, 3) = stress[3];
+    e(3, 2) = stress[3];
+    e(1, 3) = stress[4];
+    e(3, 1) = stress[4];
+    e(1, 2) = stress[5];
+    e(2, 1) = stress[5];
+
+    NEWMAT::Jacobi(e, D, V);
+
+    Coord v((Real)V(1, 1), (Real)V(2, 1), (Real)V(3, 1));
+    v.normalize();
+
+    helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
+
+    tetraInf[elementIndex].maxStress = (Real)D(1, 1);
+    tetraInf[elementIndex].principalStressDirection = tetrahedronInf[elementIndex].rotatedInitialElements * Coord(v[0], v[1], v[2]);
+    tetraInf[elementIndex].principalStressDirection *= tetraInf[elementIndex].maxStress / 100.00;
+    tetrahedronInfo.endEdit();
 }
 
 } // namespace sofa::component::forcefield
