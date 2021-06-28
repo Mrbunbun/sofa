@@ -101,6 +101,11 @@ TetrahedralCorotationalFEMForceField<DataTypes>::TetrahedralCorotationalFEMForce
     , _showStressColorMap(initData(&_showStressColorMap, std::string("Blue to Red"), "showStressColorMap", "Color map used to show stress values"))
     , _showVonMisesColorMap(initData(&_showVonMisesColorMap, true, "showVonMisesColorMap", "display von Mises stress color map"))
     , m_VonMisesColorMap(nullptr)
+
+    , d_computePrincipalStress(initData(&d_computePrincipalStress, true, "computePrincipalStress", "compute principal stress"))
+    , d_computePrincipalStrain(initData(&d_computePrincipalStrain, true, "computePrincipalStrain", "compute principal strain"))
+    , showPrincipalStress(initData(&showPrincipalStress, true, "showPrincipalStress", "display principal stress vector field"))
+    , showPrincipalStrain(initData(&showPrincipalStrain, true, "showPrincipalStrain", "display principal strain vector field"))
 {
     this->addAlias(&_assembling, "assembling");
     _poissonRatio.setWidget("poissonRatio");
@@ -323,6 +328,47 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::addForce(const core::Mecha
     d_f.endEdit();
 
     updateVonMisesStress = true;
+    if (d_computePrincipalStress.getValue() || d_computePrincipalStrain.getValue())
+    {
+        unsigned int nbTetra = m_topology->getNbTetrahedra();
+        helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
+        for (unsigned int i = 0; i < nbTetra; ++i)
+        {
+            const core::topology::BaseMeshTopology::Tetrahedron t = m_topology->getTetrahedron(i);
+            const VecCoord& X0 = this->mstate->read(core::ConstVecCoordId::restPosition())->getValue();
+            Index a = t[0];
+            Index b = t[1];
+            Index c = t[2];
+            Index d = t[3];
+            // displacements
+            Displacement D;
+            D[0] = 0;
+            D[1] = 0;
+            D[2] = 0;
+            D[3] = (X0)[b][0] - (X0)[a][0] - p[b][0] + p[a][0];
+            D[4] = (X0)[b][1] - (X0)[a][1] - p[b][1] + p[a][1];
+            D[5] = (X0)[b][2] - (X0)[a][2] - p[b][2] + p[a][2];
+            D[6] = (X0)[c][0] - (X0)[a][0] - p[c][0] + p[a][0];
+            D[7] = (X0)[c][1] - (X0)[a][1] - p[c][1] + p[a][1];
+            D[8] = (X0)[c][2] - (X0)[a][2] - p[c][2] + p[a][2];
+            D[9] = (X0)[d][0] - (X0)[a][0] - p[d][0] + p[a][0];
+            D[10] = (X0)[d][1] - (X0)[a][1] - p[d][1] + p[a][1];
+            D[11] = (X0)[d][2] - (X0)[a][2] - p[d][2] + p[a][2];
+
+            computeStrainDisplacement(tetraInf[i].strainDisplacementTransposedMatrix, tetraInf[i].rotatedInitialElements[0], tetraInf[i].rotatedInitialElements[1], tetraInf[i].rotatedInitialElements[2], tetraInf[i].rotatedInitialElements[3]);
+            defaulttype::Vec<6, Real> strain;
+            computeStrain(strain, tetraInf[i].strainDisplacementTransposedMatrix, D);
+            defaulttype::Vec<6, Real> stress;
+            computeStress(stress, tetraInf[i].materialMatrix, strain);
+            tetraInf[i].strain = strain;
+            tetraInf[i].stress = stress;
+            if(d_computePrincipalStrain.getValue())
+                computePrincipalStrain(i, tetraInf[i].strain);
+            if (d_computePrincipalStress.getValue())
+                computePrincipalStress(i, tetraInf[i].stress);
+        }
+        tetrahedronInfo.endEdit();
+    }
 }
 
 template<class DataTypes>
@@ -1779,7 +1825,7 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computeStrain(defaulttype:
 // --- Stress = K * Strain = KJtD = KBd
 // --------------------------------------------------------------------------------------------------------
 template <class DataTypes>
-void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<3, Real> &strain)
+void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<6, Real> &strain)
 {
     stress[0] = K[0][0] * strain[0] + K[0][1] * strain[1] + K[0][2] * strain[2] /* + K[0][3] * strain[3] + K[0][4] * strain[4] + K[0][5] * strain[5]*/;
     stress[1] = K[1][0] * strain[0] + K[1][1] * strain[1] + K[1][2] * strain[2] /* + K[1][3] * strain[3] + K[1][4] * strain[4] + K[1][5] * strain[5]*/;
@@ -1822,7 +1868,7 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStrain(Ind
     helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
 
     tetraInf[elementIndex].maxStrain = (Real)D(1, 1);
-    tetraInf[elementIndex].principalStrainDirection = tetrahedronInf[elementIndex].rotatedInitialElements * Coord(v[0], v[1], v[2]);
+    tetraInf[elementIndex].principalStrainDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
     tetraInf[elementIndex].principalStrainDirection *= tetraInf[elementIndex].maxStrain / 100.00;
     tetrahedronInfo.endEdit();
 }
@@ -1857,7 +1903,7 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStress(Ind
     helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
 
     tetraInf[elementIndex].maxStress = (Real)D(1, 1);
-    tetraInf[elementIndex].principalStressDirection = tetrahedronInf[elementIndex].rotatedInitialElements * Coord(v[0], v[1], v[2]);
+    tetraInf[elementIndex].principalStressDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
     tetraInf[elementIndex].principalStressDirection *= tetraInf[elementIndex].maxStress / 100.00;
     tetrahedronInfo.endEdit();
 }

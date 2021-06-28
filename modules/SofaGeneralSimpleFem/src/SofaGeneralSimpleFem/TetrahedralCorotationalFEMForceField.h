@@ -115,6 +115,10 @@ protected:
         Transformation initialTransformation;
         /// von Mises stress
         Real vonMisesStress;
+        /// strain vector
+        defaulttype::Vec<6, Real> strain;
+        /// stress vector
+        defaulttype::Vec<6, Real> stress;
         /// max strain
         Real maxStrain;
         /// principal strain direction
@@ -253,7 +257,7 @@ protected:
     void computeMaterialStiffness(int i, Index& a, Index& b, Index& c, Index& d);
 
     void computeStrain(defaulttype::Vec<6, Real> &strain, const StrainDisplacementTransposed &J, const Displacement &D);
-    void computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<3, Real> &strain);
+    void computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<6, Real> &strain);
     void computePrincipalStrain(Index elementIndex, defaulttype::Vec<6, Real> &strain);
     void computePrincipalStress(Index elementIndex, defaulttype::Vec<6, Real> &stress);
 
@@ -309,6 +313,11 @@ public:
     Data<bool> _showVonMisesColorMap;
     Real minVM;
     Real maxVM;
+
+    Data<bool> d_computePrincipalStress;
+    Data<bool> showPrincipalStress;
+    Data<bool> d_computePrincipalStrain;
+    Data<bool> showPrincipalStrain;
 
 };
 
