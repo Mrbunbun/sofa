@@ -99,7 +99,7 @@ TetrahedralCorotationalFEMForceField<DataTypes>::TetrahedralCorotationalFEMForce
     , _indexedElements(nullptr)
     , _showStressAlpha(initData(&_showStressAlpha, 1.0f, "showStressAlpha", "Alpha for vonMises visualisation"))
     , _showStressColorMap(initData(&_showStressColorMap, std::string("Blue to Red"), "showStressColorMap", "Color map used to show stress values"))
-    , _showVonMisesColorMap(initData(&_showVonMisesColorMap, true, "showVonMisesColorMap", "display von Mises stress color map"))
+    , _showVonMisesColorMap(initData(&_showVonMisesColorMap, false, "showVonMisesColorMap", "display von Mises stress color map"))
     , m_VonMisesColorMap(nullptr)
 
     , d_computePrincipalStress(initData(&d_computePrincipalStress, true, "computePrincipalStress", "compute principal stress"))
@@ -1498,10 +1498,10 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::draw(const core::visual::V
         points[3].push_back(pb);
     }
 
-    vparams->drawTool()->drawTriangles(points[0], drawColor1.getValue());
-    vparams->drawTool()->drawTriangles(points[1], drawColor2.getValue());
-    vparams->drawTool()->drawTriangles(points[2], drawColor3.getValue());
-    vparams->drawTool()->drawTriangles(points[3], drawColor4.getValue());
+    //vparams->drawTool()->drawTriangles(points[0], drawColor1.getValue());
+    //vparams->drawTool()->drawTriangles(points[1], drawColor2.getValue());
+    //vparams->drawTool()->drawTriangles(points[2], drawColor3.getValue());
+    //vparams->drawTool()->drawTriangles(points[3], drawColor4.getValue());
 
     if (vparams->displayFlags().getShowWireFrame())
         vparams->drawTool()->setPolygonMode(0,false);
@@ -1568,8 +1568,51 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::draw(const core::visual::V
         vparams->drawTool()->drawTriangles(points, colorVector);
     }
 
+    if (showPrincipalStress.getValue())
+    {
+        if(!d_computePrincipalStress.getValue())
+            msg_warning() << "principal stress vector field can only be displayed if option computePrincipalStress is set to true";
+        
+        vector<Coord> points;
+        helper::vector<typename TetrahedralCorotationalFEMForceField<DataTypes>::TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
+        for (Size i = 0; i < m_topology->getNbTetrahedra(); ++i)
+        {
+            const core::topology::BaseMeshTopology::Tetrahedron t = m_topology->getTetrahedron(i);
+            Index a = t[0];
+            Index b = t[1];
+            Index c = t[2];
+            Index d = t[3];
+            Coord center = (x[a] + x[b] + x[c] + x[d]) /4.0;
+            Coord principalStressDirection = center + tetraInf[i].principalStressDirection;
+            points.push_back(center);
+            points.push_back(principalStressDirection);
+            vparams->drawTool()->drawLines(points, 1, sofa::helper::types::RGBAColor(1, 1, 1, 1));
+            points.clear();
+        }
+    }
 
+    if (showPrincipalStrain.getValue())
+    {
+        if (!d_computePrincipalStrain.getValue())
+            msg_warning() << "principal strain vector field can only be displayed if option computePrincipalStrain is set to true";
 
+        vector<Coord> points;
+        helper::vector<typename TetrahedralCorotationalFEMForceField<DataTypes>::TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
+        for (Size i = 0; i < m_topology->getNbTetrahedra(); ++i)
+        {
+            const core::topology::BaseMeshTopology::Tetrahedron t = m_topology->getTetrahedron(i);
+            Index a = t[0];
+            Index b = t[1];
+            Index c = t[2];
+            Index d = t[3];
+            Coord center = (x[a] + x[b] + x[c] + x[d]) / 4.0;
+            Coord principalStrainDirection = center + tetraInf[i].principalStrainDirection;
+            points.push_back(center);
+            points.push_back(principalStrainDirection);
+            vparams->drawTool()->drawLines(points, 1, sofa::helper::types::RGBAColor(0, 1, 0, 1));
+            points.clear();
+        }
+    }
 
 }
 
@@ -1862,21 +1905,34 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStrain(Ind
 
     NEWMAT::Jacobi(e, D, V);
 
-    Coord v((Real)V(1, 1), (Real)V(2, 1), (Real)V(3, 1));
+    //get the index of the biggest eigenvalue in absolute value
+    unsigned int biggestIndex = 0;
+    if (fabs(D(1, 1)) > fabs(D(2, 2)))
+        biggestIndex = 1;
+    else
+        biggestIndex = 2;
+    if (fabs(D(3, 3)) > fabs(D(biggestIndex, biggestIndex)))
+        biggestIndex = 3;
+
+    Coord v((Real)V(1, biggestIndex), (Real)V(2, biggestIndex), (Real)V(3, biggestIndex));
     v.normalize();
 
     helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
 
-    tetraInf[elementIndex].maxStrain = (Real)D(1, 1);
+    tetraInf[elementIndex].maxStrain = (Real)D(biggestIndex, biggestIndex);
+    tetraInf[elementIndex].principalStrainDirection = Coord(v[0], v[1], v[2]);
+    std::cout << "[strain] element " << elementIndex << " avant rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
     tetraInf[elementIndex].principalStrainDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
-    tetraInf[elementIndex].principalStrainDirection *= tetraInf[elementIndex].maxStrain / 100.00;
+    std::cout << "[strain] element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
+    std::cout << " " << std::endl;
+    tetraInf[elementIndex].principalStrainDirection *= tetraInf[elementIndex].maxStrain;
     tetrahedronInfo.endEdit();
 }
 
 template <class DataTypes>
 void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStress(Index elementIndex, defaulttype::Vec<6, Real>& stress)
 {
-    NEWMAT::SymmetricMatrix e(2);
+    NEWMAT::SymmetricMatrix e(3);
     e = 0.0;
 
     NEWMAT::DiagonalMatrix D(2);
@@ -1897,14 +1953,27 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStress(Ind
 
     NEWMAT::Jacobi(e, D, V);
 
-    Coord v((Real)V(1, 1), (Real)V(2, 1), (Real)V(3, 1));
+    //get the index of the biggest eigenvalue in absolute value
+    unsigned int biggestIndex = 0;
+    if (fabs(D(1, 1)) > fabs(D(2, 2)))
+        biggestIndex = 1;
+    else
+        biggestIndex = 2;
+    if (fabs(D(3, 3)) > fabs(D(biggestIndex, biggestIndex)))
+        biggestIndex = 3;
+
+    Coord v((Real)V(1, biggestIndex), (Real)V(2, biggestIndex), (Real)V(3, biggestIndex));
     v.normalize();
 
     helper::vector<TetrahedronInformation>& tetraInf = *(tetrahedronInfo.beginEdit());
 
-    tetraInf[elementIndex].maxStress = (Real)D(1, 1);
+    tetraInf[elementIndex].maxStress = (Real)D(biggestIndex, biggestIndex);
+    tetraInf[elementIndex].principalStressDirection = Coord(v[0], v[1], v[2]);
+    std::cout << "element "<<elementIndex<<" avant rota "<< tetraInf[elementIndex].principalStressDirection << std::endl;
     tetraInf[elementIndex].principalStressDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
-    tetraInf[elementIndex].principalStressDirection *= tetraInf[elementIndex].maxStress / 100.00;
+    std::cout << "element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStressDirection << std::endl;
+    std::cout << " " << std::endl;
+    tetraInf[elementIndex].principalStressDirection *= tetraInf[elementIndex].maxStress;
     tetrahedronInfo.endEdit();
 }
 
