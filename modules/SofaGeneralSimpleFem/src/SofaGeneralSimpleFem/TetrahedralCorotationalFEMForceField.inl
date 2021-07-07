@@ -104,8 +104,8 @@ TetrahedralCorotationalFEMForceField<DataTypes>::TetrahedralCorotationalFEMForce
 
     , d_computePrincipalStress(initData(&d_computePrincipalStress, true, "computePrincipalStress", "compute principal stress"))
     , d_computePrincipalStrain(initData(&d_computePrincipalStrain, true, "computePrincipalStrain", "compute principal strain"))
-    , showPrincipalStress(initData(&showPrincipalStress, true, "showPrincipalStress", "display principal stress vector field"))
-    , showPrincipalStrain(initData(&showPrincipalStrain, true, "showPrincipalStrain", "display principal strain vector field"))
+    , showPrincipalStress(initData(&showPrincipalStress, false, "showPrincipalStress", "display principal stress vector field"))
+    , showPrincipalStrain(initData(&showPrincipalStrain, false, "showPrincipalStrain", "display principal strain vector field"))
 {
     this->addAlias(&_assembling, "assembling");
     _poissonRatio.setWidget("poissonRatio");
@@ -1870,12 +1870,19 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computeStrain(defaulttype:
 template <class DataTypes>
 void TetrahedralCorotationalFEMForceField<DataTypes>::computeStress(defaulttype::Vec<6, Real> &stress, MaterialStiffness &K, defaulttype::Vec<6, Real> &strain)
 {
-    stress[0] = K[0][0] * strain[0] + K[0][1] * strain[1] + K[0][2] * strain[2] /* + K[0][3] * strain[3] + K[0][4] * strain[4] + K[0][5] * strain[5]*/;
-    stress[1] = K[1][0] * strain[0] + K[1][1] * strain[1] + K[1][2] * strain[2] /* + K[1][3] * strain[3] + K[1][4] * strain[4] + K[1][5] * strain[5]*/;
-    stress[2] = K[2][0] * strain[0] + K[2][1] * strain[1] + K[2][2] * strain[2] /* + K[2][3] * strain[3] + K[2][4] * strain[4] + K[2][5] * strain[5]*/;
-    stress[3] = /*K[3][0] * strain[0] + K[3][1] * strain[1] + K[3][2] * strain[2] + */ K[3][3] * strain[3] /* + K[3][4] * strain[4] + K[3][5] * strain[5]*/;
-    stress[4] = /*K[4][0] * strain[0] + K[4][1] * strain[1] + K[4][2] * strain[2] + K[4][3] * strain[3] + */ K[4][4] * strain[4] /* + K[4][5] * strain[5]*/;
-    stress[5] = /*K[5][0] * strain[0] + K[5][1] * strain[1] + K[5][2] * strain[2] + K[5][3] * strain[3] + K[5][4] * strain[4] + */ K[5][5] * strain[5];
+    // Optimisations: The following values are 0 (per computeMaterialStiffnesses )
+    // K[0][3]    K[0][4]    K[0][5]
+    // K[1][3]    K[1][4]    K[1][5]
+    // K[2][3]    K[2][4]    K[2][5]
+    // K[3][0]    K[3][1]    K[3][2]    K[3][4]    K[3][5]
+    // K[4][0]    K[4][1]    K[4][2]    K[4][3]    K[4][5]
+    // K[5][0]    K[5][1]    K[5][2]    K[5][3]    K[5][4]
+    stress[0] = K[0][0] * strain[0] + K[0][1] * strain[1] + K[0][2] * strain[2] + K[0][3] * strain[3] + K[0][4] * strain[4] + K[0][5] * strain[5];
+    stress[1] = K[1][0] * strain[0] + K[1][1] * strain[1] + K[1][2] * strain[2] + K[1][3] * strain[3] + K[1][4] * strain[4] + K[1][5] * strain[5];
+    stress[2] = K[2][0] * strain[0] + K[2][1] * strain[1] + K[2][2] * strain[2] + K[2][3] * strain[3] + K[2][4] * strain[4] + K[2][5] * strain[5];
+    stress[3] = K[3][0] * strain[0] + K[3][1] * strain[1] + K[3][2] * strain[2] + K[3][3] * 2 * strain[3] + K[3][4] * strain[4] + K[3][5] * strain[5];
+    stress[4] = K[4][0] * strain[0] + K[4][1] * strain[1] + K[4][2] * strain[2] + K[4][3] * strain[3] + K[4][4] * 2 * strain[4] + K[4][5] * strain[5];
+    stress[5] = K[5][0] * strain[0] + K[5][1] * strain[1] + K[5][2] * strain[2] + K[5][3] * strain[3] + K[5][4] * strain[4] + K[5][5] * 2 * strain[5];
 }
 
 // --------------------------------------------------------------------------------------
@@ -1921,10 +1928,10 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStrain(Ind
 
     tetraInf[elementIndex].maxStrain = (Real)D(biggestIndex, biggestIndex);
     tetraInf[elementIndex].principalStrainDirection = Coord(v[0], v[1], v[2]);
-    std::cout << "[strain] element " << elementIndex << " avant rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
+    //std::cout << "[strain] element " << elementIndex << " avant rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
     tetraInf[elementIndex].principalStrainDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
-    std::cout << "[strain] element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
-    std::cout << " " << std::endl;
+    //std::cout << "[strain] element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStrainDirection << std::endl;
+    //std::cout << " " << std::endl;
     tetraInf[elementIndex].principalStrainDirection *= tetraInf[elementIndex].maxStrain;
     tetrahedronInfo.endEdit();
 }
@@ -1969,10 +1976,10 @@ void TetrahedralCorotationalFEMForceField<DataTypes>::computePrincipalStress(Ind
 
     tetraInf[elementIndex].maxStress = (Real)D(biggestIndex, biggestIndex);
     tetraInf[elementIndex].principalStressDirection = Coord(v[0], v[1], v[2]);
-    std::cout << "element "<<elementIndex<<" avant rota "<< tetraInf[elementIndex].principalStressDirection << std::endl;
+    //std::cout << "element "<<elementIndex<<" avant rota "<< tetraInf[elementIndex].principalStressDirection << std::endl;
     tetraInf[elementIndex].principalStressDirection = tetraInf[elementIndex].rotation * Coord(v[0], v[1], v[2]);
-    std::cout << "element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStressDirection << std::endl;
-    std::cout << " " << std::endl;
+    //std::cout << "element " << elementIndex << " apres rota " << tetraInf[elementIndex].principalStressDirection << std::endl;
+    //std::cout << " " << std::endl;
     tetraInf[elementIndex].principalStressDirection *= tetraInf[elementIndex].maxStress;
     tetrahedronInfo.endEdit();
 }

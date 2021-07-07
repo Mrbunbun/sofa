@@ -144,8 +144,7 @@ protected:
             return in;
         }
     };
-    /// container that stotes all requires information for each tetrahedron
-    topology::TetrahedronData<sofa::helper::vector<TetrahedronInformation> > tetrahedronInfo;
+    
 
     /// @name Full system matrix assembly support
     /// @{
@@ -160,6 +159,11 @@ protected:
     SReal m_potentialEnergy;
 
     sofa::core::topology::BaseMeshTopology* _topology;
+
+public:
+    /// container that stotes all requires information for each tetrahedron
+    topology::TetrahedronData<sofa::helper::vector<TetrahedronInformation> > tetrahedronInfo;
+
 public:
     class SOFA_SOFAGENERALSIMPLEFEM_API TetrahedronHandler : public topology::TopologyDataHandler<core::topology::BaseMeshTopology::Tetrahedron, sofa::helper::vector<TetrahedronInformation> >
     {
